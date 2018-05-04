@@ -51,6 +51,7 @@ import com.google.android.gms.vision.barcode.Barcode;
 import com.google.android.gms.vision.barcode.BarcodeDetector;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Activity for the multi-tracker app.  This app detects barcodes and displays the value with the
@@ -67,7 +68,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
     private static final int RC_HANDLE_CAMERA_PERM = 2;
 
     // constants used to pass extra data in the intent
-    public static final String AutoFocus = "AutoFocus";
+    public static final String AutoDetect = "AutoDetect";
     public static final String UseFlash = "UseFlash";
     public static final String BarcodeObject = "Barcode";
 
@@ -78,6 +79,8 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
     // helper objects for detecting taps and pinches.
     private ScaleGestureDetector scaleGestureDetector;
     private GestureDetector gestureDetector;
+
+    private boolean autoDetect;
 
     /**
      * Initializes the UI and creates the detector pipeline.
@@ -91,14 +94,14 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
         mGraphicOverlay = (GraphicOverlay<BarcodeGraphic>) findViewById(R.id.graphicOverlay);
 
         // read parameters from the intent used to launch the activity.
-        boolean autoFocus = getIntent().getBooleanExtra(AutoFocus, false);
         boolean useFlash = getIntent().getBooleanExtra(UseFlash, false);
+        autoDetect = getIntent().getBooleanExtra(AutoDetect, false);
 
         // Check for the camera permission before accessing the camera.  If the
         // permission is not granted yet, request permission.
         int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         if (rc == PackageManager.PERMISSION_GRANTED) {
-            createCameraSource(autoFocus, useFlash);
+            createCameraSource(true, useFlash);
         } else {
             requestCameraPermission();
         }
@@ -203,7 +206,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
         CameraSource.Builder builder = new CameraSource.Builder(getApplicationContext(), barcodeDetector)
                 .setFacing(CameraSource.CAMERA_FACING_BACK)
                 .setRequestedPreviewSize(1600, 1024)
-                .setRequestedFps(15.0f);
+                .setRequestedFps(30.0f);
 
         // make sure that auto focus is an available option
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
@@ -277,7 +280,7 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
         if (grantResults.length != 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "Camera permission granted - initialize the camera source");
             // we have permission, so create the camerasource
-            boolean autoFocus = getIntent().getBooleanExtra(AutoFocus,false);
+            boolean autoFocus = getIntent().getBooleanExtra(AutoDetect,false);
             boolean useFlash = getIntent().getBooleanExtra(UseFlash, false);
             createCameraSource(autoFocus, useFlash);
             return;
@@ -359,13 +362,17 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
         }
 
         if (best != null) {
-            Intent data = new Intent();
-            data.putExtra(BarcodeObject, best);
-            setResult(CommonStatusCodes.SUCCESS, data);
-            finish();
+            returnFromActivity(best);
             return true;
         }
         return false;
+    }
+
+    private void returnFromActivity(Barcode best) {
+        Intent data = new Intent();
+        data.putExtra(BarcodeObject, best);
+        setResult(CommonStatusCodes.SUCCESS, data);
+        finish();
     }
 
     private class CaptureGestureListener extends GestureDetector.SimpleOnGestureListener {
@@ -429,8 +436,29 @@ public final class BarcodeCaptureActivity extends AppCompatActivity implements B
         }
     }
 
+
+
     @Override
     public void onBarcodeDetected(Barcode barcode) {
-        //do something with barcode data returned
+        if (barcode.displayValue.length() % 3 == 0) {
+            List<String> rarePieces = MonopolyPieces.findRarePieces(barcode.displayValue);
+            if (rarePieces.isEmpty()) {
+                Snackbar.make(mGraphicOverlay, "Nothing rare here",
+                        Snackbar.LENGTH_LONG)
+                        .show();
+
+            } else {
+                StringBuilder pieces = new StringBuilder();
+                for( String piece : rarePieces) {
+                    pieces.append(piece).append(" ");
+                }
+                Snackbar.make(mGraphicOverlay, "Rare piece: " + pieces,
+                        Snackbar.LENGTH_LONG)
+                        .show();
+            }
+            if (autoDetect) {
+                returnFromActivity(barcode);
+            }
+        }
     }
 }

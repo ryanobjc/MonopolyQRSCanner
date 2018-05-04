@@ -27,6 +27,8 @@ import android.widget.TextView;
 import com.google.android.gms.common.api.CommonStatusCodes;
 import com.google.android.gms.vision.barcode.Barcode;
 
+import java.util.List;
+
 /**
  * Main activity demonstrating how to pass extra parameters to an activity that
  * reads barcodes.
@@ -34,8 +36,8 @@ import com.google.android.gms.vision.barcode.Barcode;
 public class MainActivity extends Activity implements View.OnClickListener {
 
     // use a compound button so either checkbox or switch widgets work.
-    private CompoundButton autoFocus;
     private CompoundButton useFlash;
+    private CompoundButton autoDetect;
     private TextView statusMessage;
     private TextView barcodeValue;
 
@@ -50,8 +52,8 @@ public class MainActivity extends Activity implements View.OnClickListener {
         statusMessage = (TextView)findViewById(R.id.status_message);
         barcodeValue = (TextView)findViewById(R.id.barcode_value);
 
-        autoFocus = (CompoundButton) findViewById(R.id.auto_focus);
         useFlash = (CompoundButton) findViewById(R.id.use_flash);
+        autoDetect = (CompoundButton) findViewById(R.id.auto_pick);
 
         findViewById(R.id.read_barcode).setOnClickListener(this);
     }
@@ -66,7 +68,7 @@ public class MainActivity extends Activity implements View.OnClickListener {
         if (v.getId() == R.id.read_barcode) {
             // launch barcode activity.
             Intent intent = new Intent(this, BarcodeCaptureActivity.class);
-            intent.putExtra(BarcodeCaptureActivity.AutoFocus, autoFocus.isChecked());
+            intent.putExtra(BarcodeCaptureActivity.AutoDetect, autoDetect.isChecked());
             intent.putExtra(BarcodeCaptureActivity.UseFlash, useFlash.isChecked());
 
             startActivityForResult(intent, RC_BARCODE_CAPTURE);
@@ -103,7 +105,22 @@ public class MainActivity extends Activity implements View.OnClickListener {
                 if (data != null) {
                     Barcode barcode = data.getParcelableExtra(BarcodeCaptureActivity.BarcodeObject);
                     statusMessage.setText(R.string.barcode_success);
-                    barcodeValue.setText(barcode.displayValue);
+
+                    if (barcode.displayValue.length() % 3 == 0) {
+
+                        List<String> rarePieces = MonopolyPieces.findRarePieces(barcode.displayValue);
+                        if (rarePieces.isEmpty()) {
+                            barcodeValue.setText("No rare pieces\n" + barcode.displayValue);
+                        } else {
+                            StringBuilder pieces = new StringBuilder();
+                            for( String piece : rarePieces) {
+                                pieces.append(piece).append(" ");
+                            }
+                            barcodeValue.setText("Rare piece: " + pieces + "\n" + barcode.displayValue);
+                        }
+                    } else {
+                        barcodeValue.setText(barcode.displayValue);
+                    }
                     Log.d(TAG, "Barcode read: " + barcode.displayValue);
                 } else {
                     statusMessage.setText(R.string.barcode_failure);
